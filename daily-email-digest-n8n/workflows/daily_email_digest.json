@@ -1,0 +1,760 @@
+{
+  "name": "Daily Gmail Digest → Gemini Summary → Slack copy",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "1717a386-6ba8-4c00-8efb-a9ffc47866e0",
+      "name": "Daily 8AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "readStatus": "unread",
+          "receivedAfter": "={{ $now.minus({ hours: 24 }).toISO() }}"
+        }
+      },
+      "id": "5bf9bf9e-89e7-41a8-960e-d527a8b45e88",
+      "name": "Fetch Unread Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        464,
+        400
+      ],
+      "webhookId": "ff68a02a-0c26-42c1-9c9f-3ac45093990c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r3MIj3TgWK5rhQjE",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition-error-check",
+              "leftValue": "={{ $input.first().json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true,
+          "looseTypeValidation": true
+        }
+      },
+      "id": "9d9dfd6b-0408-4f9b-a779-965a5eaa36b3",
+      "name": "Check Gmail Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        704,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#new-channel",
+          "mode": "name"
+        },
+        "text": "=⚠️ *Gmail Connection Failed*\n\nThe Daily Email Digest workflow could not fetch emails from Gmail.\n\n*Error:* {{ $json.error.message || 'Unknown Gmail connection error' }}\n*Time:* {{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}\n*Execution ID:* {{ $execution.id }}\n\nPlease check Gmail credentials and retry.",
+        "otherOptions": {}
+      },
+      "id": "9249301a-5f81-42e1-9762-881ba99c6a8a",
+      "name": "Post Gmail Error to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        256
+      ],
+      "webhookId": "738c4dba-0797-40bb-8a80-42ac60d38498",
+      "credentials": {
+        "slackApi": {
+          "id": "ST2AE5ClaMGbEtd3",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-status-gmail-fail",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "set-error-gmail-fail",
+              "name": "error",
+              "value": "Gmail connection failed",
+              "type": "string"
+            },
+            {
+              "id": "set-timestamp-gmail-fail",
+              "name": "completedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "61cc8c70-0070-4359-ad6e-932e1334431e",
+      "name": "Mark Failed - Gmail",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition-has-emails",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c384d832-dbd2-4904-92a1-04c4735e6b43",
+      "name": "Check Emails Exist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#daily-email-digest",
+          "mode": "name"
+        },
+        "text": "=📭 *Daily Email Digest — {{ $now.toFormat('EEEE, MMM dd yyyy') }}*\n\nNo unread emails in the last 24 hours.",
+        "otherOptions": {}
+      },
+      "id": "3597e13a-d6ec-4eac-b2b0-c4527b7c5e2a",
+      "name": "Post No Emails to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        656
+      ],
+      "webhookId": "ebe4ed97-674b-41d9-96d3-02d6374814a6",
+      "credentials": {
+        "slackApi": {
+          "id": "ST2AE5ClaMGbEtd3",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-status-no-emails",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "set-message-no-emails",
+              "name": "message",
+              "value": "No unread emails found",
+              "type": "string"
+            },
+            {
+              "id": "set-timestamp-no-emails",
+              "name": "completedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7b3b2176-f677-46ef-8a47-c8cc3b9d3ae0",
+      "name": "Mark Complete - No Emails",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1456,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-subject",
+              "name": "subject",
+              "value": "={{ $json.Subject || '(No Subject)' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-from",
+              "name": "from",
+              "value": "={{ $json.From || 'Unknown Sender' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-body",
+              "name": "body",
+              "value": "={{ $json.snippet || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-date",
+              "name": "date",
+              "value": "={{ $json.internalDate || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ed6210ab-223b-4727-819b-cb1727f6e2c8",
+      "name": "Extract Email Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-fallback-summary",
+              "name": "summary",
+              "value": "=⚠️ _Summary unavailable (Gemini API error)_ — Subject: {{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "keep-subject-error",
+              "name": "subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "keep-from-error",
+              "name": "from",
+              "value": "={{ $json.from }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "20c1f474-8557-406d-b109-20efc53c1da3",
+      "name": "Set Fallback Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-gemini-summary",
+              "name": "summary",
+              "value": "={{ JSON.stringify($json).includes('candidates') ? $json['candidates'][0]['content']['parts'][0]['text'] : 'No summary generated' }}",
+              "type": "string"
+            },
+            {
+              "id": "keep-subject-success",
+              "name": "subject",
+              "value": "={{ $('Extract Email Fields').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "keep-from-success",
+              "name": "from",
+              "value": "={{ $('Extract Email Fields').item.json.from }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1697e6e6-b158-4071-9c5a-b792138cb207",
+      "name": "Set Gemini Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "emails",
+        "options": {}
+      },
+      "id": "b78518ae-ceaa-4095-b9e9-319efd758736",
+      "name": "Aggregate All Summaries",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2208,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const emails = $input.first().json.emails;\n\nconst bullets = emails.map(e => {\n  const subject = e.subject || '(No Subject)';\n  const from = e.from || 'Unknown';\n  const summary = e.summary || 'No summary available';\n  return `• *${subject}* (from: ${from})\\n  _${summary}_`;\n}).join('\\n\\n');\n\nconst count = emails.length;\nconst date = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'short',\n  day: 'numeric'\n});\n\nconst message = `📬 *Daily Email Digest — ${date}*\\n\\n` +\n  `*${count} unread email${count !== 1 ? 's' : ''}* summarized:\\n\\n` +\n  bullets;\n\nreturn [{ json: { slackMessage: message, emailCount: count } }];"
+      },
+      "id": "a703339f-aa3b-441e-9406-e4db01ceb855",
+      "name": "Format Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#new-channel",
+          "mode": "name"
+        },
+        "text": "={{ $json.slackMessage }}",
+        "otherOptions": {}
+      },
+      "id": "190ed31b-ad4c-44b7-ad79-80975a8f579f",
+      "name": "Post Digest to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2704,
+        512
+      ],
+      "webhookId": "a391b518-e1ef-4aa7-b2c1-5d0707e1548f",
+      "credentials": {
+        "slackApi": {
+          "id": "ST2AE5ClaMGbEtd3",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-status-success",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "set-count-success",
+              "name": "emailsProcessed",
+              "value": "={{ $json.emailCount }}",
+              "type": "string"
+            },
+            {
+              "id": "set-timestamp-success",
+              "name": "completedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0d0f09a3-d02d-4b9d-a9b6-19312ca80b67",
+      "name": "Mark Complete - Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2960,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 📋 Daily Gmail Digest Workflow\n\n**Purpose:** Fetch all unread Gmail emails from the last 24 hours, summarize each with Google Gemini, and post a formatted digest to Slack.\n\n**Schedule:** Every day at 8:00 AM\n\n**Slack Channel:** `#daily-email-digest`\n\n---\n\n### Input Schema\n| Field | Type | Source |\n|-------|------|--------|\n| subject | string | Gmail |\n| body (textPlain) | string | Gmail |\n| from | string | Gmail |\n| date | ISO datetime | Gmail |\n| isUnread | boolean | Gmail filter |\n\n### Output Format\n`• [Subject] (from: Sender): [1-2 sentence Gemini summary]`",
+        "height": 350,
+        "width": 400
+      },
+      "id": "3037d3fa-7b69-4153-afc8-4b6728243bbc",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ Error Handling\n\n**Gmail failure →** Posts error to Slack, marks workflow failed.\n\n**No emails →** Posts \"No unread emails\" to Slack, marks complete.\n\n**Gemini failure →** Retries once (3s delay). If still fails, uses fallback text and continues so other emails aren't blocked.\n\n**Slack failure →** Workflow errors visibly in n8n execution log.",
+        "height": 250,
+        "width": 350
+      },
+      "id": "03bb6604-3433-4345-b83b-7bf75e341630",
+      "name": "Sticky Note - Error Handling",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        32,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+       "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_GEMINI_API_KEY",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Summarize this email in 1-2 concise sentences. Focus on key action items. No preamble.\\n\\nSubject: {{ $json.subject }}\\nFrom: {{ $json.from }}\\nBody: {{ $json.body }}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1472,
+        256
+      ],
+      "id": "34e75820-cfbf-4867-9a4f-f3677a2f088c",
+      "name": "Summarize Email with Gemini",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition-gemini-error",
+              "leftValue": "={{ $json.candidates }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "f3c8a2d6-1cbb-4fae-8ca3-6e3e0cda3e12",
+      "name": "Check Gemini Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        512
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 8AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Unread Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Unread Emails": {
+      "main": [
+        [
+          {
+            "node": "Check Gmail Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Gmail Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Gmail Error": {
+      "main": [
+        [
+          {
+            "node": "Post Gmail Error to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Emails Exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Gmail Error to Slack": {
+      "main": [
+        [
+          {
+            "node": "Mark Failed - Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Emails Exist": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post No Emails to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post No Emails to Slack": {
+      "main": [
+        [
+          {
+            "node": "Mark Complete - No Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fallback Summary": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Summaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Gemini Summary": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Summaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate All Summaries": {
+      "main": [
+        [
+          {
+            "node": "Format Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post Digest to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Digest to Slack": {
+      "main": [
+        [
+          {
+            "node": "Mark Complete - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Fields": {
+      "main": [
+        [
+          {
+            "node": "Summarize Email with Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Email with Gemini": {
+      "main": [
+        [
+          {
+            "node": "Check Gemini Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Gemini Error": {
+      "main": [
+        [
+          {
+            "node": "Set Fallback Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Gemini Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "23188496-956b-4840-b099-8cb8dbaa7ef9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "11de98cef50ad9f97af03ea41f9b0e0a61fc0b222494b0f85650e9a5403a648e"
+  },
+  "nodeGroups": [],
+  "id": "pCEHiox0lDV3ovlt",
+  "tags": [
+    {
+      "updatedAt": "2026-06-11T16:48:51.593Z",
+      "createdAt": "2026-06-11T16:48:51.593Z",
+      "id": "JwzOP0MZq3hf4Nhf",
+      "name": "gemini-ai"
+    },
+    {
+      "updatedAt": "2026-06-11T16:48:51.568Z",
+      "createdAt": "2026-06-11T16:48:51.568Z",
+      "id": "M8kyS01j2ZrHUsGd",
+      "name": "daily-digest"
+    },
+    {
+      "updatedAt": "2026-06-11T16:48:51.395Z",
+      "createdAt": "2026-06-11T16:48:51.395Z",
+      "id": "iUQ4XIE0qchJNVXM",
+      "name": "email-automation"
+    }
+  ]
+}

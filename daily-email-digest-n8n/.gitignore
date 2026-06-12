@@ -1,0 +1,24 @@
+# Environment & secrets
+.env
+*.key
+*.pem
+credentials.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Node
+node_modules/
+npm-debug.log
+
+# n8n local data
+.n8n/
+
+# Temporary files
+*.tmp
+*.bak
